@@ -1,26 +1,50 @@
+/* app/globals.css */
 @import "tailwindcss";
 
+@theme {
+  /* Afroman-inspired palette with added alpha channels */
+  --color-groove-green: #1B4332;
+  --color-groove-green-a50: rgba(27, 67, 50, 0.5); /* for overlays */
+  --color-groove-green-light: #2D6A4F;
+  --color-groove-green-dark: #081C15;
+  --color-groove-green-dark-a90: rgba(8, 28, 21, 0.9); /* for background blending */
+  
+  --color-groove-gold: #D4AF37;
+  --color-groove-gold-light: #F3C623;
+  --color-groove-gold-dark: #AA8C2C;
+  
+  --color-groove-red: #E63946;
+  --color-groove-red-dark: #B91C1C;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: var(--color-groove-green-dark);
+  --foreground: #F3F4F6; /* light gray for readable text */
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
+  background-color: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* CSS Glitch Animation Utility */
+@keyframes living-glitch {
+  0% { text-shadow: 1px 0 0 red, -1px 0 0 blue; }
+  2% { text-shadow: 2px 0 0 red, -2px 0 0 blue; transform: translate(-1px, 1px); }
+  4% { text-shadow: -1px 0 0 red, 1px 0 0 blue; transform: translate(1px, -1px); }
+  6% { text-shadow: 1px 0 0 red, -1px 0 0 blue; transform: translate(0, 0); }
+  100% { text-shadow: 1px 0 0 red, -1px 0 0 blue; }
+}
+
+@utility glitch-text {
+  animation: living-glitch 5s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Utility for turning grayscale images green and grungy */
+@utility grungy-green-filter {
+  filter: sepia(100%) saturate(150%) hue-rotate(90deg) brightness(80%) contrast(120%);
 }
