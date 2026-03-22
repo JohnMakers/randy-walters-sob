@@ -54,7 +54,7 @@ export default function SnitchBox() {
         {/* HEADER BLOCK - Fixed the collision by using flex-col and gap-4 */}
         <div className="flex flex-col items-center text-center mb-10 mt-4 relative z-10 gap-4">
           <h2 className="text-4xl md:text-5xl font-black text-[var(--color-groove-red)] uppercase tracking-wide glitch-text drop-shadow-[2px_2px_0_rgba(255,255,255,0.2)]">
-            Want to call Randy Walters a bitch with us?
+            Want to call Randy a bitch with us?
           </h2>
           <p className="text-[var(--color-groove-gold)] font-bold bg-[var(--color-groove-green-dark)] border border-[var(--color-groove-green-light)] px-4 py-2 uppercase tracking-widest text-sm text-center">
             Submit your video now!
