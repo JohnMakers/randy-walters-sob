@@ -11,7 +11,6 @@ export default function AdminDashboard() {
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New states for the YouTube Quick-Add form
   const [ytTitle, setYtTitle] = useState('');
   const [ytUrl, setYtUrl] = useState('');
 
@@ -34,6 +33,8 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from('videos')
       .select('*')
+      .order('is_featured', { ascending: false }) // Group featured videos at the top
+      .order('priority_order', { ascending: false })
       .order('created_at', { ascending: false });
     
     if (error) console.error('Error fetching videos:', error);
@@ -51,23 +52,33 @@ export default function AdminDashboard() {
     fetchVideos(); 
   };
 
+  const toggleFeatured = async (id: string, currentStatus: boolean) => {
+    await supabase.from('videos').update({ is_featured: !currentStatus }).eq('id', id);
+    fetchVideos();
+  };
+
   const updateVideoOrder = async (id: string, priority_order: number) => {
     await supabase.from('videos').update({ priority_order }).eq('id', id);
     fetchVideos();
   };
 
-  // Function to inject a YouTube video directly
+  const deleteVideo = async (id: string) => {
+    if (window.confirm("CRITICAL WARNING: Are you sure you want to permanently delete this evidence? This cannot be undone.")) {
+      await supabase.from('videos').delete().eq('id', id);
+      fetchVideos();
+    }
+  };
+
   const handleAddYouTube = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ytTitle || !ytUrl) return;
 
     const { error } = await supabase.from('videos').insert([
-      { title: ytTitle, youtube_url: ytUrl, status: 'public', priority_order: 10 }
+      { title: ytTitle, youtube_url: ytUrl, status: 'public', priority_order: 1, is_featured: true }
     ]);
 
-    if (error) {
-      alert("Error adding YouTube video: " + error.message);
-    } else {
+    if (error) alert("Error adding YouTube video: " + error.message);
+    else {
       setYtTitle('');
       setYtUrl('');
       fetchVideos();
@@ -101,7 +112,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[var(--color-groove-green-dark)] p-8 text-white">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <div className="flex justify-between items-end border-b-4 border-[var(--color-groove-gold)] pb-4 mb-8">
           <div>
             <h1 className="text-4xl font-black text-[var(--color-groove-gold)] uppercase tracking-wide">The Control Room</h1>
@@ -127,65 +138,107 @@ export default function AdminDashboard() {
               className="flex-1 bg-[var(--color-groove-green-dark)] border-2 border-[var(--color-groove-green-light)] rounded p-3 text-white focus:border-[var(--color-groove-gold)] outline-none"
             />
             <button type="submit" className="bg-[var(--color-groove-red)] hover:bg-[var(--color-groove-red-dark)] text-white font-black px-6 py-3 rounded uppercase transition-colors">
-              Pin to Wall
+              Inject to Hero
             </button>
           </form>
         </div>
 
         {/* The Moderation Table */}
-        <div className="bg-black border-2 border-[var(--color-groove-green-light)] rounded-xl overflow-hidden shadow-xl">
-          <table className="w-full text-left border-collapse">
+        <div className="bg-black border-2 border-[var(--color-groove-green-light)] rounded-xl overflow-x-auto shadow-xl">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[var(--color-groove-green)] text-[var(--color-groove-gold)] uppercase text-sm font-black tracking-wider">
-                <th className="p-4">Evidence Source / Title</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 w-24">Order</th>
+                <th className="p-4">Evidence Title</th>
+                <th className="p-4">Encoding</th>
+                <th className="p-4">Visibility</th>
+                <th className="p-4">Placement</th>
+                <th className="p-4 w-24 text-center">Sort</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {videos.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-400 font-bold">The Snitch Box is empty.</td>
+                  <td colSpan={6} className="p-8 text-center text-gray-400 font-bold">The Vault is empty.</td>
                 </tr>
-              ) : videos.map((video) => (
-                <tr key={video.id} className="border-t border-[var(--color-groove-green-light)] hover:bg-[var(--color-groove-green-dark)] transition-colors">
-                  <td className="p-4">
-                    <div className="font-bold">{video.title}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {video.youtube_url ? `YouTube: ${video.youtube_url}` : 'Mux Upload'}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 text-xs uppercase font-black rounded ${
-                      video.status === 'public' ? 'bg-green-500 text-black' : 
-                      video.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
-                    }`}>
-                      {video.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <input 
-                      type="number" 
-                      defaultValue={video.priority_order}
-                      onBlur={(e) => updateVideoOrder(video.id, parseInt(e.target.value))}
-                      className="w-16 bg-black border border-[var(--color-groove-gold)] rounded p-1 text-center text-white"
-                    />
-                  </td>
-                  <td className="p-4 flex gap-2 justify-end">
-                    {video.status !== 'public' && (
-                      <button onClick={() => updateVideoStatus(video.id, 'public')} className="bg-[var(--color-groove-green)] text-white px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-green-light)]">
-                        Approve
+              ) : videos.map((video) => {
+                const isProcessing = video.mux_playback_id?.startsWith('processing');
+                
+                return (
+                  <tr key={video.id} className="border-t border-[var(--color-groove-green-light)] hover:bg-[var(--color-groove-green-dark)] transition-colors">
+                    
+                    {/* Title & Source */}
+                    <td className="p-4">
+                      <div className="font-bold text-white">{video.title}</div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {video.youtube_url ? `YouTube: ${video.youtube_url}` : 'Mux Direct Upload'}
+                      </div>
+                    </td>
+
+                    {/* Encoding Status */}
+                    <td className="p-4">
+                      {video.youtube_url ? (
+                        <span className="text-gray-500 text-xs font-bold uppercase">N/A (YouTube)</span>
+                      ) : isProcessing ? (
+                        <span className="text-yellow-500 text-xs font-black uppercase animate-pulse">Processing...</span>
+                      ) : (
+                        <span className="text-green-400 text-xs font-bold uppercase">Ready</span>
+                      )}
+                    </td>
+
+                    {/* Visibility Status */}
+                    <td className="p-4">
+                      <span className={`px-2 py-1 text-xs uppercase font-black rounded ${
+                        video.status === 'public' ? 'bg-green-500 text-black' : 
+                        video.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
+                      }`}>
+                        {video.status}
+                      </span>
+                    </td>
+
+                    {/* Placement Toggle */}
+                    <td className="p-4">
+                      <button 
+                        onClick={() => toggleFeatured(video.id, video.is_featured)}
+                        className={`px-3 py-1 text-xs font-black uppercase border-2 rounded transition-colors ${
+                          video.is_featured 
+                            ? 'bg-[var(--color-groove-gold)] border-[var(--color-groove-gold)] text-black hover:bg-transparent hover:text-[var(--color-groove-gold)]' 
+                            : 'bg-transparent border-gray-600 text-gray-400 hover:border-white hover:text-white'
+                        }`}
+                      >
+                        {video.is_featured ? 'Hero Carousel' : 'The Wall'}
                       </button>
-                    )}
-                    {video.status !== 'hidden' && (
-                      <button onClick={() => updateVideoStatus(video.id, 'hidden')} className="bg-[var(--color-groove-red)] text-white px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-red-dark)]">
-                        Hide
+                    </td>
+
+                    {/* Sort Order */}
+                    <td className="p-4">
+                      <input 
+                        type="number" 
+                        defaultValue={video.priority_order}
+                        onBlur={(e) => updateVideoOrder(video.id, parseInt(e.target.value))}
+                        className="w-16 bg-black border border-[var(--color-groove-green-light)] rounded p-1 text-center text-white focus:border-[var(--color-groove-gold)] outline-none"
+                      />
+                    </td>
+
+                    {/* Actions */}
+                    <td className="p-4 flex gap-2 justify-end">
+                      {video.status !== 'public' && (
+                        <button onClick={() => updateVideoStatus(video.id, 'public')} className="bg-[var(--color-groove-green)] text-white px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-green-light)]">
+                          Approve
+                        </button>
+                      )}
+                      {video.status !== 'hidden' && (
+                        <button onClick={() => updateVideoStatus(video.id, 'hidden')} className="bg-zinc-800 text-white px-3 py-1 rounded text-sm font-bold hover:bg-zinc-700">
+                          Hide
+                        </button>
+                      )}
+                      <button onClick={() => deleteVideo(video.id)} className="bg-transparent border border-[var(--color-groove-red)] text-[var(--color-groove-red)] px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-red)] hover:text-white transition-colors">
+                        Delete
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
