@@ -16,12 +16,18 @@ export default async function Home() {
 
   if (error) console.error("Error fetching videos:", error);
 
-  const safeVideos = videos || [];
-  const featuredVideos = safeVideos.slice(0, 3);
-  const gridVideos = safeVideos.slice(3);
+  // 1. Filter out videos that are still processing in Mux
+  const readyVideos = (videos || []).filter(video => {
+    if (video.youtube_url) return true; // YouTube is always ready
+    if (video.mux_playback_id && !video.mux_playback_id.startsWith('processing')) return true; // Mux is ready
+    return false; // Still processing or missing ID
+  });
+  
+  // 2. Route the videos EXACTLY where the Admin specified
+  const featuredVideos = readyVideos.filter(v => v.is_featured === true);
+  const gridVideos = readyVideos.filter(v => v.is_featured !== true);
 
   return (
-    // Added h-screen, overflow-y-auto, snap-y, and snap-mandatory 
     <main className="relative h-screen w-full overflow-y-auto snap-y snap-mandatory bg-[var(--color-groove-green-dark)] selection:bg-[var(--color-groove-red)] selection:text-white scroll-smooth">
       
       {/* GLOBAL GRUNGY BACKGROUND */}

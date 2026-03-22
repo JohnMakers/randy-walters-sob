@@ -33,7 +33,6 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from('videos')
       .select('*')
-      .order('is_featured', { ascending: false }) // Group featured videos at the top
       .order('priority_order', { ascending: false })
       .order('created_at', { ascending: false });
     
@@ -57,8 +56,17 @@ export default function AdminDashboard() {
     fetchVideos();
   };
 
-  const updateVideoOrder = async (id: string, priority_order: number) => {
-    await supabase.from('videos').update({ priority_order }).eq('id', id);
+  const updateVideoOrder = async (id: string, newOrder: number, isFeatured: boolean) => {
+    // COLLISION DETECTION: Prevent duplicate orders in the same placement
+    const isDuplicate = videos.some(v => v.id !== id && v.is_featured === isFeatured && v.priority_order === newOrder);
+    
+    if (isDuplicate) {
+      alert(`Order #${newOrder} is already being used in this section. Please choose a unique number to avoid display issues.`);
+      fetchVideos(); // Resets the input field back to its original database value
+      return;
+    }
+
+    await supabase.from('videos').update({ priority_order: newOrder }).eq('id', id);
     fetchVideos();
   };
 
@@ -73,8 +81,12 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!ytTitle || !ytUrl) return;
 
+    // Auto-calculate the next available priority order for the Hero so it doesn't collide
+    const heroOrders = videos.filter(v => v.is_featured).map(v => v.priority_order || 0);
+    const nextOrder = heroOrders.length > 0 ? Math.max(...heroOrders) + 1 : 1;
+
     const { error } = await supabase.from('videos').insert([
-      { title: ytTitle, youtube_url: ytUrl, status: 'public', priority_order: 1, is_featured: true }
+      { title: ytTitle, youtube_url: ytUrl, status: 'public', priority_order: nextOrder, is_featured: true }
     ]);
 
     if (error) alert("Error adding YouTube video: " + error.message);
@@ -110,10 +122,73 @@ export default function AdminDashboard() {
     );
   }
 
+  const heroVideos = videos.filter(v => v.is_featured);
+  const wallVideos = videos.filter(v => !v.is_featured);
+
+  const VideoTableRow = ({ video }: { video: any }) => {
+    const isProcessing = video.mux_playback_id?.startsWith('processing');
+    return (
+      <tr className="border-t border-[var(--color-groove-green-light)] hover:bg-[var(--color-groove-green-dark)] transition-colors">
+        <td className="p-4 w-24">
+          <input 
+            type="number" 
+            defaultValue={video.priority_order}
+            onBlur={(e) => updateVideoOrder(video.id, parseInt(e.target.value), video.is_featured)}
+            className="w-16 bg-black border border-[var(--color-groove-green-light)] rounded p-2 text-center text-white focus:border-[var(--color-groove-gold)] outline-none font-bold"
+          />
+        </td>
+        <td className="p-4">
+          <div className="font-bold text-white">{video.title}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            {video.youtube_url ? `YouTube: ${video.youtube_url}` : 'Mux Direct Upload'}
+          </div>
+        </td>
+        <td className="p-4">
+          {video.youtube_url ? (
+            <span className="text-gray-500 text-xs font-bold uppercase">N/A (YouTube)</span>
+          ) : isProcessing ? (
+            <span className="text-yellow-500 text-xs font-black uppercase animate-pulse">Processing...</span>
+          ) : (
+            <span className="text-green-400 text-xs font-bold uppercase">Ready</span>
+          )}
+        </td>
+        <td className="p-4">
+          <span className={`px-2 py-1 text-xs uppercase font-black rounded ${
+            video.status === 'public' ? 'bg-green-500 text-black' : 
+            video.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
+          }`}>
+            {video.status}
+          </span>
+        </td>
+        <td className="p-4 flex gap-2 justify-end flex-wrap">
+          <button 
+            onClick={() => toggleFeatured(video.id, video.is_featured)}
+            className="bg-black border border-[var(--color-groove-gold)] text-[var(--color-groove-gold)] px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-gold)] hover:text-black transition-colors"
+          >
+            Move to {video.is_featured ? 'Wall' : 'Hero'}
+          </button>
+          {video.status !== 'public' && (
+            <button onClick={() => updateVideoStatus(video.id, 'public')} className="bg-[var(--color-groove-green)] text-white px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-green-light)]">
+              Approve
+            </button>
+          )}
+          {video.status !== 'hidden' && (
+            <button onClick={() => updateVideoStatus(video.id, 'hidden')} className="bg-zinc-800 text-white px-3 py-1 rounded text-sm font-bold hover:bg-zinc-700">
+              Hide
+            </button>
+          )}
+          <button onClick={() => deleteVideo(video.id)} className="bg-transparent border border-[var(--color-groove-red)] text-[var(--color-groove-red)] px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-red)] hover:text-white transition-colors">
+            Delete
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--color-groove-green-dark)] p-8 text-white">
+    <div className="min-h-screen bg-[var(--color-groove-green-dark)] p-4 md:p-8 text-white">
       <div className="max-w-[1400px] mx-auto">
-        <div className="flex justify-between items-end border-b-4 border-[var(--color-groove-gold)] pb-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-4 border-[var(--color-groove-gold)] pb-4 mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-black text-[var(--color-groove-gold)] uppercase tracking-wide">The Control Room</h1>
             <p className="text-[var(--color-groove-green-light)] font-bold mt-1">Manage the madness.</p>
@@ -124,7 +199,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Add YouTube Section */}
-        <div className="bg-black border-2 border-[var(--color-groove-gold)] rounded-xl p-6 mb-8 shadow-[0_0_20px_rgba(212,175,55,0.1)]">
+        <div className="bg-black border-2 border-[var(--color-groove-gold)] rounded-xl p-6 mb-12 shadow-[0_0_20px_rgba(212,175,55,0.1)]">
           <h2 className="text-2xl font-black text-[var(--color-groove-gold)] uppercase mb-4">Add Official YouTube Video</h2>
           <form onSubmit={handleAddYouTube} className="flex flex-col md:flex-row gap-4">
             <input 
@@ -143,105 +218,56 @@ export default function AdminDashboard() {
           </form>
         </div>
 
-        {/* The Moderation Table */}
-        <div className="bg-black border-2 border-[var(--color-groove-green-light)] rounded-xl overflow-x-auto shadow-xl">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-[var(--color-groove-green)] text-[var(--color-groove-gold)] uppercase text-sm font-black tracking-wider">
-                <th className="p-4">Evidence Title</th>
-                <th className="p-4">Encoding</th>
-                <th className="p-4">Visibility</th>
-                <th className="p-4">Placement</th>
-                <th className="p-4 w-24 text-center">Sort</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {videos.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-400 font-bold">The Vault is empty.</td>
+        {/* PLACEMENT 1: HERO CAROUSEL */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-black text-[var(--color-groove-gold)] uppercase mb-4 border-l-8 border-[var(--color-groove-red)] pl-4">
+            Hero Carousel (Featured)
+          </h2>
+          <div className="bg-black border-2 border-[var(--color-groove-green-light)] rounded-xl overflow-x-auto shadow-xl">
+            <table className="w-full text-left border-collapse min-w-[900px]">
+              <thead>
+                <tr className="bg-[var(--color-groove-green)] text-[var(--color-groove-gold)] uppercase text-sm font-black tracking-wider">
+                  <th className="p-4">Sort</th>
+                  <th className="p-4">Evidence Title</th>
+                  <th className="p-4">Encoding</th>
+                  <th className="p-4">Visibility</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
-              ) : videos.map((video) => {
-                const isProcessing = video.mux_playback_id?.startsWith('processing');
-                
-                return (
-                  <tr key={video.id} className="border-t border-[var(--color-groove-green-light)] hover:bg-[var(--color-groove-green-dark)] transition-colors">
-                    
-                    {/* Title & Source */}
-                    <td className="p-4">
-                      <div className="font-bold text-white">{video.title}</div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {video.youtube_url ? `YouTube: ${video.youtube_url}` : 'Mux Direct Upload'}
-                      </div>
-                    </td>
-
-                    {/* Encoding Status */}
-                    <td className="p-4">
-                      {video.youtube_url ? (
-                        <span className="text-gray-500 text-xs font-bold uppercase">N/A (YouTube)</span>
-                      ) : isProcessing ? (
-                        <span className="text-yellow-500 text-xs font-black uppercase animate-pulse">Processing...</span>
-                      ) : (
-                        <span className="text-green-400 text-xs font-bold uppercase">Ready</span>
-                      )}
-                    </td>
-
-                    {/* Visibility Status */}
-                    <td className="p-4">
-                      <span className={`px-2 py-1 text-xs uppercase font-black rounded ${
-                        video.status === 'public' ? 'bg-green-500 text-black' : 
-                        video.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
-                      }`}>
-                        {video.status}
-                      </span>
-                    </td>
-
-                    {/* Placement Toggle */}
-                    <td className="p-4">
-                      <button 
-                        onClick={() => toggleFeatured(video.id, video.is_featured)}
-                        className={`px-3 py-1 text-xs font-black uppercase border-2 rounded transition-colors ${
-                          video.is_featured 
-                            ? 'bg-[var(--color-groove-gold)] border-[var(--color-groove-gold)] text-black hover:bg-transparent hover:text-[var(--color-groove-gold)]' 
-                            : 'bg-transparent border-gray-600 text-gray-400 hover:border-white hover:text-white'
-                        }`}
-                      >
-                        {video.is_featured ? 'Hero Carousel' : 'The Wall'}
-                      </button>
-                    </td>
-
-                    {/* Sort Order */}
-                    <td className="p-4">
-                      <input 
-                        type="number" 
-                        defaultValue={video.priority_order}
-                        onBlur={(e) => updateVideoOrder(video.id, parseInt(e.target.value))}
-                        className="w-16 bg-black border border-[var(--color-groove-green-light)] rounded p-1 text-center text-white focus:border-[var(--color-groove-gold)] outline-none"
-                      />
-                    </td>
-
-                    {/* Actions */}
-                    <td className="p-4 flex gap-2 justify-end">
-                      {video.status !== 'public' && (
-                        <button onClick={() => updateVideoStatus(video.id, 'public')} className="bg-[var(--color-groove-green)] text-white px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-green-light)]">
-                          Approve
-                        </button>
-                      )}
-                      {video.status !== 'hidden' && (
-                        <button onClick={() => updateVideoStatus(video.id, 'hidden')} className="bg-zinc-800 text-white px-3 py-1 rounded text-sm font-bold hover:bg-zinc-700">
-                          Hide
-                        </button>
-                      )}
-                      <button onClick={() => deleteVideo(video.id)} className="bg-transparent border border-[var(--color-groove-red)] text-[var(--color-groove-red)] px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-red)] hover:text-white transition-colors">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {heroVideos.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-gray-400 font-bold">No videos in the Hero Carousel.</td></tr>
+                ) : heroVideos.map((video) => <VideoTableRow key={video.id} video={video} />)}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* PLACEMENT 2: THE WALL */}
+        <div>
+          <h2 className="text-3xl font-black text-[var(--color-groove-gold)] uppercase mb-4 border-l-8 border-[var(--color-groove-gold)] pl-4">
+            The People's Wall (Grid)
+          </h2>
+          <div className="bg-black border-2 border-[var(--color-groove-green-light)] rounded-xl overflow-x-auto shadow-xl">
+            <table className="w-full text-left border-collapse min-w-[900px]">
+              <thead>
+                <tr className="bg-[var(--color-groove-green)] text-[var(--color-groove-gold)] uppercase text-sm font-black tracking-wider">
+                  <th className="p-4">Sort</th>
+                  <th className="p-4">Evidence Title</th>
+                  <th className="p-4">Encoding</th>
+                  <th className="p-4">Visibility</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wallVideos.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-gray-400 font-bold">No videos on The Wall.</td></tr>
+                ) : wallVideos.map((video) => <VideoTableRow key={video.id} video={video} />)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );
