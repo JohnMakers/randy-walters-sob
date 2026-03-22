@@ -33,7 +33,7 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from('videos')
       .select('*')
-      .order('priority_order', { ascending: false })
+      .order('priority_order', { ascending: true }) // Changed to true!
       .order('created_at', { ascending: false });
     
     if (error) console.error('Error fetching videos:', error);
@@ -57,12 +57,11 @@ export default function AdminDashboard() {
   };
 
   const updateVideoOrder = async (id: string, newOrder: number, isFeatured: boolean) => {
-    // COLLISION DETECTION: Prevent duplicate orders in the same placement
     const isDuplicate = videos.some(v => v.id !== id && v.is_featured === isFeatured && v.priority_order === newOrder);
     
     if (isDuplicate) {
       alert(`Order #${newOrder} is already being used in this section. Please choose a unique number to avoid display issues.`);
-      fetchVideos(); // Resets the input field back to its original database value
+      fetchVideos(); 
       return;
     }
 
@@ -81,7 +80,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!ytTitle || !ytUrl) return;
 
-    // Auto-calculate the next available priority order for the Hero so it doesn't collide
+    // Fixed math to support ascending order (put new videos at the end)
     const heroOrders = videos.filter(v => v.is_featured).map(v => v.priority_order || 0);
     const nextOrder = heroOrders.length > 0 ? Math.max(...heroOrders) + 1 : 1;
 
@@ -198,7 +197,6 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* Quick Add YouTube Section */}
         <div className="bg-black border-2 border-[var(--color-groove-gold)] rounded-xl p-6 mb-12 shadow-[0_0_20px_rgba(212,175,55,0.1)]">
           <h2 className="text-2xl font-black text-[var(--color-groove-gold)] uppercase mb-4">Add Official YouTube Video</h2>
           <form onSubmit={handleAddYouTube} className="flex flex-col md:flex-row gap-4">
@@ -218,7 +216,6 @@ export default function AdminDashboard() {
           </form>
         </div>
 
-        {/* PLACEMENT 1: HERO CAROUSEL */}
         <div className="mb-12">
           <h2 className="text-3xl font-black text-[var(--color-groove-gold)] uppercase mb-4 border-l-8 border-[var(--color-groove-red)] pl-4">
             Hero Carousel (Featured)
@@ -243,7 +240,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* PLACEMENT 2: THE WALL */}
         <div>
           <h2 className="text-3xl font-black text-[var(--color-groove-gold)] uppercase mb-4 border-l-8 border-[var(--color-groove-gold)] pl-4">
             The People's Wall (Grid)

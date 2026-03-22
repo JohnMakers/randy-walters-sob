@@ -16,18 +16,21 @@ export default function PeoplesWall({ videos }: { videos: any[] }) {
   if (!videos || videos.length === 0) return null;
 
   return (
-    <section className="w-full snap-start min-h-screen py-20 px-4 md:px-12 border-b-8 border-[var(--color-groove-gold)] relative">
+    <section className="w-full snap-start min-h-screen py-20 px-4 md:px-12 border-b-8 border-[var(--color-groove-gold)] relative flex flex-col justify-center">
       <div className="w-full max-w-7xl mx-auto flex flex-col">
         
-        {/* TITLE WRAPPER - Locked in place, z-10 prevents grid collision */}
+        {/* TITLE WRAPPER - Splitting into two lines */}
         <div className="mb-12 border-b-8 border-[var(--color-groove-red)] w-max max-w-full pb-2 relative z-10">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[var(--color-groove-gold)] tracking-tighter uppercase drop-shadow-md glitch-text bg-black/60 p-2 md:p-4 backdrop-blur-sm">
-            Is Randy Walters a son of a bitch? 
-            You be the judge.
+          <h2 className="font-black tracking-tighter uppercase drop-shadow-md glitch-text bg-black/60 p-3 md:p-5 backdrop-blur-sm flex flex-col leading-none">
+            <span className="text-3xl md:text-5xl lg:text-6xl text-[var(--color-groove-gold)]">
+              Is Randy Walters a son of a bitch?
+            </span>
+            <span className="text-2xl md:text-3xl lg:text-4xl text-[var(--color-groove-red)] mt-3">
+              You be the judge.
+            </span>
           </h2>
         </div>
 
-        {/* THE GRID - Up to 6 columns to shrink cards and fit the 12-pack gracefully */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 relative z-0">
           {videos.map((video) => {
             const ytId = video.youtube_url ? extractYouTubeID(video.youtube_url) : null;
@@ -65,7 +68,6 @@ export default function PeoplesWall({ videos }: { videos: any[] }) {
 
       </div>
 
-      {/* MODAL WRAPPER */}
       {activeVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
           <div className="relative w-full max-w-4xl aspect-video bg-black border-4 border-[var(--color-groove-gold)] shadow-[20px_20px_0_var(--color-groove-red)]">
