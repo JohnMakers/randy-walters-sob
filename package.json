@@ -1,12 +1,14 @@
 {
+ "honepage": "https://johnmakers.github.io/randy-walters-sob/",
   "name": "randy-walters-sob",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
+"scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@mux/mux-node": "^12.8.1",
