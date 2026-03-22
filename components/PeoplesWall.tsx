@@ -22,7 +22,7 @@ export default function PeoplesWall({ videos }: { videos: any[] }) {
         {/* TITLE WRAPPER - Locked in place, z-10 prevents grid collision */}
         <div className="mb-12 border-b-8 border-[var(--color-groove-red)] w-max max-w-full pb-2 relative z-10">
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[var(--color-groove-gold)] tracking-tighter uppercase drop-shadow-md glitch-text bg-black/60 p-2 md:p-4 backdrop-blur-sm">
-            The People's Wall
+            Is Randy Walters a son of a bitch? You be the judge.
           </h2>
         </div>
 

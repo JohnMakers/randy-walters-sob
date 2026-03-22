@@ -54,7 +54,7 @@ export default function HeroCarousel({ videos }: { videos: any[] }) {
             Randy Walters is a SOB!
           </h1>
           <p className="text-lg md:text-xl text-[var(--color-groove-red)] font-bold mt-4 uppercase tracking-widest inline-block p-2 px-4 bg-black border-2 border-[var(--color-groove-green-light)] rounded shadow-[4px_4px_0_var(--color-groove-red)]">
-            The People's Hall of Infamy
+            A Place Where We Can All Call Randy Walters A Son Of A Bitch Together
           </p>
         </div>
 
