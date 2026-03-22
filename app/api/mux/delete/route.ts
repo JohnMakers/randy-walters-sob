@@ -12,17 +12,32 @@ export async function POST(req: Request) {
     const { assetId } = await req.json();
 
     if (!assetId) {
-      return NextResponse.json({ error: 'No Asset ID provided' }, { status: 400 });
+      return NextResponse.json({ error: 'No ID provided' }, { status: 400 });
     }
 
-    // Attempt to delete the asset directly from Mux. 
-    // If the string is an Upload ID instead of an Asset ID (e.g. still processing), Mux might throw a 404, 
-    // which is fine, we just catch it and move on so the DB row still gets deleted.
     try {
+      // Step 1: Assume it's an Asset ID and try to nuke it
       await mux.video.assets.delete(assetId);
       console.log(`Successfully purged Mux Asset: ${assetId}`);
-    } catch (muxError: any) {
-      console.log(`Mux Deletion skipped/failed (might be an unfinished upload): ${muxError.message}`);
+    } catch (assetError: any) {
+      console.log(`Failed to delete as Asset. Checking if it is an Upload ID...`);
+      
+      try {
+        // Step 2: If it failed, it's likely an Upload ID (stuck in processing)
+        const upload = await mux.video.uploads.retrieve(assetId);
+        
+        if (upload.asset_id) {
+          // If the upload finished but our webhook missed it, delete the actual asset
+          await mux.video.assets.delete(upload.asset_id);
+          console.log(`Successfully purged Mux Asset via Upload ID: ${upload.asset_id}`);
+        } else {
+          // If no asset exists yet, kill the pending upload
+          await mux.video.uploads.cancel(assetId);
+          console.log(`Successfully cancelled pending Mux Upload: ${assetId}`);
+        }
+      } catch (uploadError: any) {
+         console.log(`Could not find record in Mux. It may already be deleted.`);
+      }
     }
 
     return NextResponse.json({ success: true });
