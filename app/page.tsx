@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import HeroCarousel from '../components/HeroCarousel';
 import PeoplesWall from '../components/PeoplesWall';
 import SnitchBox from '../components/SnitchBox';
+import Footer from '../components/Footer'; // 1. Import the new Footer
 
 export const revalidate = 0; 
 
@@ -11,7 +12,7 @@ export default async function Home() {
     .from('videos')
     .select('*')
     .eq('status', 'public')
-    .order('priority_order', { ascending: true }) // Changed to true: 1 shows up first!
+    .order('priority_order', { ascending: true }) 
     .order('created_at', { ascending: false });
 
   if (error) console.error("Error fetching videos:", error);
@@ -42,6 +43,9 @@ export default async function Home() {
         <HeroCarousel videos={featuredVideos} />
         <PeoplesWall videos={gridVideos} />
         <SnitchBox />
+        
+        {/* 2. Drop the Footer at the very bottom of the Content Portal */}
+        <Footer />
       </div>
     </main>
   );
