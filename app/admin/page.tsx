@@ -3,6 +3,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import MuxPlayer from '@mux/mux-player-react';
+
+// Helper to extract YouTube IDs for the preview modal
+const extractYouTubeID = (url: string) => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -10,6 +18,9 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // NEW: State to handle the cinematic preview modal
+  const [previewVideo, setPreviewVideo] = useState<any | null>(null);
 
   const [ytTitle, setYtTitle] = useState('');
   const [ytUrl, setYtUrl] = useState('');
@@ -51,15 +62,13 @@ export default function AdminDashboard() {
     fetchVideos(); 
   };
 
-  // SMART APPROVAL: Routes to Wall and assigns the last score automatically
   const approveVideo = async (id: string) => {
-    // Find the highest priority number currently on The Wall
     const wallOrders = videos.filter(v => !v.is_featured && v.status === 'public').map(v => v.priority_order || 0);
     const nextOrder = wallOrders.length > 0 ? Math.max(...wallOrders) + 1 : 1;
 
     await supabase.from('videos').update({ 
       status: 'public',
-      is_featured: false, // Default to Wall
+      is_featured: false, 
       priority_order: nextOrder 
     }).eq('id', id);
     
@@ -84,11 +93,8 @@ export default function AdminDashboard() {
     fetchVideos();
   };
 
-  // COMPLETE DESTROY: Deletes from Mux servers first, then wipes from Supabase
   const deleteVideo = async (id: string, muxAssetId: string | null) => {
     if (window.confirm("CRITICAL WARNING: Are you sure you want to permanently delete this evidence? It will be wiped from Mux and the database. This cannot be undone.")) {
-      
-      // 1. If it's a Mux video (not YouTube), wipe it from Mux storage
       if (muxAssetId && !muxAssetId.startsWith('http')) {
         try {
           await fetch('/api/mux/delete', {
@@ -100,8 +106,6 @@ export default function AdminDashboard() {
           console.error("Failed to reach Mux Delete API", e);
         }
       }
-
-      // 2. Wipe it from Supabase
       await supabase.from('videos').delete().eq('id', id);
       fetchVideos();
     }
@@ -151,7 +155,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // Segment the videos based on their status and placement
   const pendingVideos = videos.filter(v => v.status === 'pending');
   const heroVideos = videos.filter(v => v.is_featured && v.status === 'public');
   const wallVideos = videos.filter(v => !v.is_featured && v.status === 'public');
@@ -186,6 +189,16 @@ export default function AdminDashboard() {
           )}
         </td>
         <td className="p-4 flex gap-2 justify-end flex-wrap">
+          
+          {/* NEW: PREVIEW BUTTON */}
+          <button 
+            onClick={() => setPreviewVideo(video)}
+            disabled={isProcessing}
+            className="bg-black border border-[var(--color-groove-green-light)] text-[var(--color-groove-green-light)] px-3 py-1 rounded text-sm font-bold hover:bg-[var(--color-groove-green-light)] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+          >
+            {isProcessing ? 'Wait...' : 'Preview'}
+          </button>
+
           {video.status === 'pending' && (
             <button onClick={() => approveVideo(video.id)} className="bg-[var(--color-groove-green)] text-white px-4 py-1 rounded text-sm font-black uppercase hover:bg-[var(--color-groove-green-light)] border border-green-400 shadow-[0_0_10px_rgba(45,106,79,0.5)]">
               Approve to Wall
@@ -222,7 +235,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-groove-green-dark)] p-4 md:p-8 text-white">
+    <div className="min-h-screen bg-[var(--color-groove-green-dark)] p-4 md:p-8 text-white relative">
       <div className="max-w-[1400px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-4 border-[var(--color-groove-gold)] pb-4 mb-8 gap-4">
           <div>
@@ -324,8 +337,27 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
-
       </div>
+
+      {/* NEW: THE CINEMATIC PREVIEW MODAL */}
+      {previewVideo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-4xl aspect-video bg-black border-4 border-[var(--color-groove-gold)] shadow-[20px_20px_0_var(--color-groove-red)]">
+            <button 
+              onClick={() => setPreviewVideo(null)}
+              className="absolute -top-6 -right-6 z-10 bg-black text-[var(--color-groove-red)] w-12 h-12 border-4 border-[var(--color-groove-red)] font-black text-2xl hover:bg-[var(--color-groove-red)] hover:text-black transition-all shadow-[4px_4px_0_rgba(255,255,255,0.2)]"
+            >
+              X
+            </button>
+            
+            {previewVideo.youtube_url ? (
+              <iframe className="w-full h-full object-cover" src={`https://www.youtube.com/embed/${extractYouTubeID(previewVideo.youtube_url)}?autoplay=1&rel=0&modestbranding=1`} title={previewVideo.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            ) : (
+              <MuxPlayer playbackId={previewVideo.mux_playback_id} autoPlay streamType="on-demand" primaryColor="#D4AF37" secondaryColor="#081C15" className="w-full h-full" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
